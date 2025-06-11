@@ -10,98 +10,216 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+// Enhanced middleware with better security and performance
+app.use(cors({
+  origin: isProduction ? ['https://your-domain.vercel.app'] : true,
+  credentials: true
+}));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Serve static files with better caching in production
+if (isProduction) {
+  app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1y',
+    etag: false
+  }));
+} else {
+  app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // Set EJS as template engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Book API service functions
+// Enhanced Book API service with better error handling and performance
 class BookService {
   constructor() {
     this.cache = new Map();
     this.cacheExpiry = 30 * 60 * 1000; // 30 minutes
+    this.requestTimeout = 10000; // 10 seconds
   }
 
-  // Get books from Project Gutenberg (Free classics)
+  // Enhanced fetch with timeout and retry logic
+  async fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.requestTimeout);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Free-Library-Hub/1.0',
+          ...options.headers
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
+  }
+
+  // Get books from Project Gutenberg with enhanced error handling
   async getGutenbergBooks(limit = 20) {
+    const cacheKey = `gutenberg_${limit}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      return cached.data;
+    }
+
     try {
-      const response = await fetch(`https://gutendex.com/books/?sort=download_count&languages=en&page=1`);
+      const response = await this.fetchWithTimeout(
+        `https://gutendex.com/books/?sort=download_count&languages=en&page=1`
+      );
       const data = await response.json();
       
-      return data.results.slice(0, limit).map(book => ({
+      if (!data.results || !Array.isArray(data.results)) {
+        throw new Error('Invalid response format from Gutenberg API');
+      }
+      
+      const books = data.results.slice(0, limit).map(book => ({
         id: book.id,
-        title: book.title,
-        authors: book.authors.map(author => author.name).join(', '),
-        subjects: book.subjects.slice(0, 3),
-        downloadCount: book.download_count,
-        formats: book.formats,
-        languages: book.languages,
-        copyright: book.copyright,
+        title: book.title || 'Unknown Title',
+        authors: book.authors?.map(author => author.name).join(', ') || 'Unknown Author',
+        subjects: book.subjects?.slice(0, 3) || [],
+        downloadCount: book.download_count || 0,
+        formats: book.formats || {},
+        languages: book.languages || ['en'],
+        copyright: book.copyright || false,
         source: 'Project Gutenberg',
-        downloadUrl: book.formats['text/html'] || book.formats['text/plain'] || book.formats['application/epub+zip'],
-        coverImage: book.formats['image/jpeg'] || '/images/default-book.jpg'
+        downloadUrl: book.formats?.['text/html'] || 
+                    book.formats?.['text/plain'] || 
+                    book.formats?.['application/epub+zip'] || '#',
+        coverImage: book.formats?.['image/jpeg'] || '/images/default-book.jpg'
       }));
+
+      // Cache the results
+      this.cache.set(cacheKey, {
+        data: books,
+        timestamp: Date.now()
+      });
+
+      return books;
     } catch (error) {
-      console.error('Error fetching Gutenberg books:', error);
+      console.error('Error fetching Gutenberg books:', error.message);
       return [];
     }
   }
 
-  // Get books from Open Library API
+  // Enhanced Open Library API with better error handling
   async getOpenLibraryBooks(query = 'popular', limit = 20) {
+    const cacheKey = `openlibrary_${query}_${limit}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      return cached.data;
+    }
+
     try {
-      const response = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=${limit}&has_fulltext=true`);
+      const encodedQuery = encodeURIComponent(query);
+      const response = await this.fetchWithTimeout(
+        `https://openlibrary.org/search.json?q=${encodedQuery}&limit=${limit}&has_fulltext=true`
+      );
       const data = await response.json();
       
-      return data.docs.map(book => ({
-        id: book.key,
-        title: book.title,
-        authors: book.author_name ? book.author_name.join(', ') : 'Unknown',
-        subjects: book.subject ? book.subject.slice(0, 3) : [],
-        publishYear: book.first_publish_year,
-        isbn: book.isbn ? book.isbn[0] : null,
+      if (!data.docs || !Array.isArray(data.docs)) {
+        throw new Error('Invalid response format from Open Library API');
+      }
+      
+      const books = data.docs.map(book => ({
+        id: book.key || `ol_${Math.random().toString(36).substr(2, 9)}`,
+        title: book.title || 'Unknown Title',
+        authors: book.author_name?.join(', ') || 'Unknown Author',
+        subjects: book.subject?.slice(0, 3) || [],
+        publishYear: book.first_publish_year || null,
+        isbn: book.isbn?.[0] || null,
         source: 'Open Library',
-        downloadUrl: `https://openlibrary.org${book.key}`,
-        coverImage: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : '/images/default-book.jpg',
-        hasFulltext: book.has_fulltext
+        downloadUrl: book.key ? `https://openlibrary.org${book.key}` : '#',
+        coverImage: book.cover_i ? 
+                   `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : 
+                   '/images/default-book.jpg',
+        hasFulltext: book.has_fulltext || false
       }));
+
+      // Cache the results
+      this.cache.set(cacheKey, {
+        data: books,
+        timestamp: Date.now()
+      });
+
+      return books;
     } catch (error) {
-      console.error('Error fetching Open Library books:', error);
+      console.error('Error fetching Open Library books:', error.message);
       return [];
     }
   }
 
-  // Get books from Internet Archive
+  // Enhanced Internet Archive API
   async getInternetArchiveBooks(limit = 20) {
+    const cacheKey = `archive_${limit}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      return cached.data;
+    }
+
     try {
-      const response = await fetch(`https://archive.org/advancedsearch.php?q=collection:opensource_books&fl=identifier,title,creator,subject,downloads,date,description&sort[]=downloads+desc&rows=${limit}&page=1&output=json`);
+      const response = await this.fetchWithTimeout(
+        `https://archive.org/advancedsearch.php?q=collection:opensource_books&fl=identifier,title,creator,subject,downloads,date,description&sort[]=downloads+desc&rows=${limit}&page=1&output=json`
+      );
       const data = await response.json();
       
-      return data.response.docs.map(book => ({
-        id: book.identifier,
-        title: book.title,
-        authors: Array.isArray(book.creator) ? book.creator.join(', ') : (book.creator || 'Unknown'),
+      if (!data.response?.docs || !Array.isArray(data.response.docs)) {
+        throw new Error('Invalid response format from Internet Archive API');
+      }
+      
+      const books = data.response.docs.map(book => ({
+        id: book.identifier || `ia_${Math.random().toString(36).substr(2, 9)}`,
+        title: book.title || 'Unknown Title',
+        authors: Array.isArray(book.creator) ? 
+                book.creator.join(', ') : 
+                (book.creator || 'Unknown Author'),
         subjects: Array.isArray(book.subject) ? book.subject.slice(0, 3) : [],
-        downloads: book.downloads,
-        date: book.date,
-        description: book.description,
+        downloads: book.downloads || 0,
+        date: book.date || null,
+        description: book.description || '',
         source: 'Internet Archive',
-        downloadUrl: `https://archive.org/details/${book.identifier}`,
-        coverImage: `https://archive.org/services/img/${book.identifier}`
+        downloadUrl: book.identifier ? `https://archive.org/details/${book.identifier}` : '#',
+        coverImage: book.identifier ? 
+                   `https://archive.org/services/img/${book.identifier}` : 
+                   '/images/default-book.jpg'
       }));
+
+      // Cache the results
+      this.cache.set(cacheKey, {
+        data: books,
+        timestamp: Date.now()
+      });
+
+      return books;
     } catch (error) {
-      console.error('Error fetching Internet Archive books:', error);
+      console.error('Error fetching Internet Archive books:', error.message);
       return [];
     }
   }
 
-  // Get trending books from multiple sources
+  // Enhanced trending books with better error handling
   async getTrendingBooks() {
     const cacheKey = 'trending_books';
     const cached = this.cache.get(cacheKey);
@@ -111,15 +229,18 @@ class BookService {
     }
 
     try {
-      const [gutenbergBooks, openLibraryBooks, archiveBooks] = await Promise.all([
+      // Use Promise.allSettled for better error handling
+      const results = await Promise.allSettled([
         this.getGutenbergBooks(10),
         this.getOpenLibraryBooks('fiction', 10),
         this.getInternetArchiveBooks(10)
       ]);
 
-      const allBooks = [...gutenbergBooks, ...openLibraryBooks, ...archiveBooks];
+      const allBooks = results
+        .filter(result => result.status === 'fulfilled')
+        .flatMap(result => result.value);
       
-      // Cache the results
+      // Cache the results even if some sources failed
       this.cache.set(cacheKey, {
         data: allBooks,
         timestamp: Date.now()
@@ -127,57 +248,92 @@ class BookService {
 
       return allBooks;
     } catch (error) {
-      console.error('Error fetching trending books:', error);
+      console.error('Error fetching trending books:', error.message);
       return [];
     }
   }
 
-  // Search books across all sources
+  // Enhanced search with better filtering
   async searchBooks(query, limit = 30) {
+    if (!query || query.trim().length === 0) {
+      return this.getTrendingBooks();
+    }
+
+    const normalizedQuery = query.toLowerCase().trim();
+    
     try {
-      const [gutenbergBooks, openLibraryBooks] = await Promise.all([
+      const results = await Promise.allSettled([
         this.getGutenbergBooks(15),
         this.getOpenLibraryBooks(query, 15)
       ]);
 
-      // Filter Gutenberg books by query
-      const filteredGutenberg = gutenbergBooks.filter(book => 
-        book.title.toLowerCase().includes(query.toLowerCase()) ||
-        book.authors.toLowerCase().includes(query.toLowerCase()) ||
-        book.subjects.some(subject => subject.toLowerCase().includes(query.toLowerCase()))
-      );
+      const [gutenbergResult, openLibraryResult] = results;
+      
+      let filteredGutenberg = [];
+      if (gutenbergResult.status === 'fulfilled') {
+        filteredGutenberg = gutenbergResult.value.filter(book => 
+          book.title.toLowerCase().includes(normalizedQuery) ||
+          book.authors.toLowerCase().includes(normalizedQuery) ||
+          book.subjects.some(subject => 
+            subject.toLowerCase().includes(normalizedQuery)
+          )
+        );
+      }
+
+      const openLibraryBooks = openLibraryResult.status === 'fulfilled' ? 
+                              openLibraryResult.value : [];
 
       return [...filteredGutenberg, ...openLibraryBooks].slice(0, limit);
     } catch (error) {
-      console.error('Error searching books:', error);
+      console.error('Error searching books:', error.message);
       return [];
     }
   }
 
-  // Get books by category
+  // Enhanced category search
   async getBooksByCategory(category, limit = 20) {
+    if (!category || category.trim().length === 0) {
+      return this.getTrendingBooks();
+    }
+
+    const normalizedCategory = category.toLowerCase().trim();
+    
     try {
-      const [openLibraryBooks, gutenbergBooks] = await Promise.all([
+      const results = await Promise.allSettled([
         this.getOpenLibraryBooks(category, limit),
         this.getGutenbergBooks(limit)
       ]);
 
-      // Filter Gutenberg books by category
-      const filteredGutenberg = gutenbergBooks.filter(book => 
-        book.subjects.some(subject => subject.toLowerCase().includes(category.toLowerCase()))
-      );
+      const [openLibraryResult, gutenbergResult] = results;
+      
+      const openLibraryBooks = openLibraryResult.status === 'fulfilled' ? 
+                              openLibraryResult.value : [];
+      
+      let filteredGutenberg = [];
+      if (gutenbergResult.status === 'fulfilled') {
+        filteredGutenberg = gutenbergResult.value.filter(book => 
+          book.subjects.some(subject => 
+            subject.toLowerCase().includes(normalizedCategory)
+          )
+        );
+      }
 
       return [...openLibraryBooks, ...filteredGutenberg].slice(0, limit);
     } catch (error) {
-      console.error('Error fetching books by category:', error);
+      console.error('Error fetching books by category:', error.message);
       return [];
     }
+  }
+
+  // Clear cache method for maintenance
+  clearCache() {
+    this.cache.clear();
   }
 }
 
 const bookService = new BookService();
 
-// Routes
+// Enhanced route handlers with better error handling
 app.get('/', async (req, res) => {
   try {
     const trendingBooks = await bookService.getTrendingBooks();
@@ -187,7 +343,7 @@ app.get('/', async (req, res) => {
       totalBooks: trendingBooks.length
     });
   } catch (error) {
-    console.error('Error loading home page:', error);
+    console.error('Error loading home page:', error.message);
     res.render('index', { 
       title: 'Free Library Hub',
       books: [],
@@ -198,8 +354,8 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/search', async (req, res) => {
-  const query = req.query.q || '';
-  const category = req.query.category || '';
+  const query = req.query.q?.trim() || '';
+  const category = req.query.category?.trim() || '';
   
   try {
     let books = [];
@@ -220,7 +376,7 @@ app.get('/search', async (req, res) => {
       totalResults: books.length
     });
   } catch (error) {
-    console.error('Error searching books:', error);
+    console.error('Error searching books:', error.message);
     res.render('search', { 
       title: 'Search Results',
       books: [],
@@ -253,7 +409,7 @@ app.get('/trending', async (req, res) => {
       books
     });
   } catch (error) {
-    console.error('Error loading trending books:', error);
+    console.error('Error loading trending books:', error.message);
     res.render('trending', { 
       title: 'Trending Books',
       books: [],
@@ -262,63 +418,152 @@ app.get('/trending', async (req, res) => {
   }
 });
 
-// API endpoints
+// Enhanced API endpoints with better validation and error handling
 app.get('/api/books/trending', async (req, res) => {
   try {
     const books = await bookService.getTrendingBooks();
-    res.json({ success: true, books, total: books.length });
+    res.json({ 
+      success: true, 
+      books, 
+      total: books.length,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('API Error - trending books:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch trending books',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 app.get('/api/books/search', async (req, res) => {
   const { q: query, category, limit = 20 } = req.query;
+  const parsedLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
   
   try {
     let books = [];
     
-    if (query) {
-      books = await bookService.searchBooks(query, parseInt(limit));
-    } else if (category) {
-      books = await bookService.getBooksByCategory(category, parseInt(limit));
+    if (query?.trim()) {
+      books = await bookService.searchBooks(query.trim(), parsedLimit);
+    } else if (category?.trim()) {
+      books = await bookService.getBooksByCategory(category.trim(), parsedLimit);
     } else {
       books = await bookService.getTrendingBooks();
     }
     
-    res.json({ success: true, books, total: books.length });
+    res.json({ 
+      success: true, 
+      books, 
+      total: books.length,
+      query: query?.trim() || null,
+      category: category?.trim() || null,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('API Error - search books:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Search failed',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 app.get('/api/books/gutenberg', async (req, res) => {
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+  
   try {
     const books = await bookService.getGutenbergBooks(limit);
-    res.json({ success: true, books, total: books.length });
+    res.json({ 
+      success: true, 
+      books, 
+      total: books.length,
+      source: 'Project Gutenberg',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('API Error - Gutenberg books:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch Gutenberg books',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 app.get('/api/books/openlibrary', async (req, res) => {
   const { q: query = 'popular', limit = 20 } = req.query;
+  const parsedLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+  
   try {
-    const books = await bookService.getOpenLibraryBooks(query, parseInt(limit));
-    res.json({ success: true, books, total: books.length });
+    const books = await bookService.getOpenLibraryBooks(query, parsedLimit);
+    res.json({ 
+      success: true, 
+      books, 
+      total: books.length,
+      source: 'Open Library',
+      query,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('API Error - Open Library books:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch Open Library books',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 app.get('/api/books/archive', async (req, res) => {
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+  
   try {
     const books = await bookService.getInternetArchiveBooks(limit);
-    res.json({ success: true, books, total: books.length });
+    res.json({ 
+      success: true, 
+      books, 
+      total: books.length,
+      source: 'Internet Archive',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('API Error - Internet Archive books:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch Internet Archive books',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Health check endpoint for monitoring
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Cache management endpoint (for admin use)
+app.post('/api/cache/clear', (req, res) => {
+  try {
+    bookService.clearCache();
+    res.json({
+      success: true,
+      message: 'Cache cleared successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear cache',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -327,16 +572,42 @@ app.use((req, res) => {
   res.status(404).render('404', { title: '404 - Page Not Found' });
 });
 
-// Error handler
+// Enhanced error handler
 app.use((error, req, res, next) => {
-  console.error('Server error:', error);
-  res.status(500).render('error', { 
-    title: 'Server Error',
-    error: 'Something went wrong on our end. Please try again later.'
-  });
+  console.error('Server error:', error.message);
+  console.error('Stack:', error.stack);
+  
+  if (res.headersSent) {
+    return next(error);
+  }
+  
+  const isApiRequest = req.path.startsWith('/api/');
+  
+  if (isApiRequest) {
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    res.status(500).render('error', { 
+      title: 'Server Error',
+      error: 'Something went wrong on our end. Please try again later.'
+    });
+  }
+});
+
+// Graceful shutdown for Vercel
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  bookService.clearCache();
 });
 
 app.listen(PORT, () => {
   console.log(`📚 Free Library Hub running on http://localhost:${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('📖 Fetching books from multiple sources...');
 });
+
+// Export for Vercel
+export default app;
