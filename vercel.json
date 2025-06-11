@@ -1,30 +1,21 @@
 {
   "version": 2,
-  "name": "free-library-hub",
   "builds": [
     {
       "src": "index.mjs",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "views/**/*",
+          "public/**/*"
+        ]
+      }
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/index.mjs"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/index.mjs"
+      "dest": "index.mjs"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "functions": {
-    "index.mjs": {
-      "maxDuration": 30
-    }
-  },
-  "regions": ["bom1"],
-  "outputDirectory": "public"
+  ]
 }
