@@ -1,0 +1,60 @@
+<!-- views/trending.ejs -->
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="main-content">
+    <div class="container">
+        <div class="page-header">
+            <h1><i class="fas fa-fire"></i> Trending Books</h1>
+            <p>Most popular and downloaded books from our sources</p>
+        </div>
+        
+        <% if (typeof error !== 'undefined') { %>
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p><%= error %></p>
+            </div>
+        <% } %>
+        
+        <div class="books-grid">
+            <% books.forEach(book => { %>
+                <div class="book-card">
+                    <div class="book-cover">
+                        <img src="<%= book.coverImage %>" alt="<%= book.title %>" loading="lazy">
+                        <div class="book-overlay">
+                            <a href="<%= book.downloadUrl %>" target="_blank" class="read-btn">
+                                <i class="fas fa-book-open"></i> Read
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="book-info">
+                        <h3 class="book-title"><%= book.title %></h3>
+                        <p class="book-author">by <%= book.authors %></p>
+                        
+                        <div class="book-meta">
+                            <span class="book-source">
+                                <i class="fas fa-external-link-alt"></i> <%= book.source %>
+                            </span>
+                            <% if (book.downloadCount) { %>
+                                <span class="book-downloads">
+                                    <i class="fas fa-download"></i> <%= book.downloadCount %>
+                                </span>
+                            <% } %>
+                        </div>
+                        
+                        <% if (book.subjects && book.subjects.length > 0) { %>
+                            <div class="book-subjects">
+                                <% book.subjects.slice(0, 2).forEach(subject => { %>
+                                    <span class="subject-tag"><%= subject %></span>
+                                <% }); %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    </div>
+</main>
+
+<%- include('partials/footer') %>

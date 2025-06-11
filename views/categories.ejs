@@ -1,0 +1,54 @@
+!-- views/categories.ejs -->
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="main-content">
+    <div class="container">
+        <div class="page-header">
+            <h1>Browse by Categories</h1>
+            <p>Explore books organized by subjects and genres</p>
+        </div>
+        
+        <div class="categories-grid">
+            <% categories.forEach(category => { %>
+                <a href="/search?category=<%= category.toLowerCase() %>" class="category-card large">
+                    <div class="category-icon">
+                        <% if (category === 'Fiction') { %>
+                            <i class="fas fa-magic"></i>
+                        <% } else if (category === 'Science') { %>
+                            <i class="fas fa-atom"></i>
+                        <% } else if (category === 'History') { %>
+                            <i class="fas fa-landmark"></i>
+                        <% } else if (category === 'Philosophy') { %>
+                            <i class="fas fa-brain"></i>
+                        <% } else if (category === 'Poetry') { %>
+                            <i class="fas fa-feather-alt"></i>
+                        <% } else if (category === 'Biography') { %>
+                            <i class="fas fa-user"></i>
+                        <% } else if (category === 'Adventure') { %>
+                            <i class="fas fa-mountain"></i>
+                        <% } else if (category === 'Romance') { %>
+                            <i class="fas fa-heart"></i>
+                        <% } else if (category === 'Mystery') { %>
+                            <i class="fas fa-search"></i>
+                        <% } else if (category === 'Fantasy') { %>
+                            <i class="fas fa-dragon"></i>
+                        <% } else if (category === 'Children') { %>
+                            <i class="fas fa-child"></i>
+                        <% } else if (category === 'Education') { %>
+                            <i class="fas fa-graduation-cap"></i>
+                        <% } else if (category === 'Technology') { %>
+                            <i class="fas fa-laptop-code"></i>
+                        <% } else { %>
+                            <i class="fas fa-book"></i>
+                        <% } %>
+                    </div>
+                    <h3><%= category %></h3>
+                    <p><%= category %> books and related content</p>
+                </a>
+            <% }); %>
+        </div>
+    </div>
+</main>
+
+<%- include('partials/footer') %>

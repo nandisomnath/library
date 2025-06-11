@@ -1,0 +1,30 @@
+<!-- views/users.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> | My Express App</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    
+    <main class="main-content">
+        <div class="container">
+            <h1><%= title %></h1>
+            <div class="users-grid">
+                <% users.forEach(user => { %>
+                    <div class="user-card">
+                        <h3><%= user.name %></h3>
+                        <p>Email: <%= user.email %></p>
+                        <p>ID: <%= user.id %></p>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </main>
+    
+    <%- include('partials/footer') %>
+</body>
+</html>

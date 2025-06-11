@@ -1,0 +1,26 @@
+<!-- views/404.ejs -->
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="main-content">
+    <div class="container">
+        <div class="error-page">
+            <div class="error-icon">
+                <i class="fas fa-book-dead"></i>
+            </div>
+            <h1>404</h1>
+            <h2>Page Not Found</h2>
+            <p>The page you're looking for seems to have been misplaced in our library.</p>
+            <div class="error-actions">
+                <a href="/" class="btn">
+                    <i class="fas fa-home"></i> Go Home
+                </a>
+                <a href="/search" class="btn btn-outline">
+                    <i class="fas fa-search"></i> Search Books
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+
+<%- include('partials/footer') %>

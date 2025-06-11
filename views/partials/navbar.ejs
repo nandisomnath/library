@@ -1,0 +1,33 @@
+<!-- views/partials/navbar.ejs -->
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-brand">
+            <a href="/">
+                <i class="fas fa-book-open"></i>
+                <span>Free Library Hub</span>
+            </a>
+        </div>
+        
+        <div class="nav-search">
+            <form action="/search" method="GET" class="search-form">
+                <input type="text" name="q" placeholder="Search books, authors, subjects..." 
+                       value="<%= typeof query !== 'undefined' ? query : '' %>" class="search-input">
+                <button type="submit" class="search-btn">
+                    <i class="fas fa-search"></i>
+                </button>
+            </form>
+        </div>
+        
+        <ul class="nav-menu">
+            <li><a href="/"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="/trending"><i class="fas fa-fire"></i> Trending</a></li>
+            <li><a href="/categories"><i class="fas fa-list"></i> Categories</a></li>
+        </ul>
+        
+        <div class="nav-toggle" id="mobile-menu">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+        </div>
+    </div>
+</nav>

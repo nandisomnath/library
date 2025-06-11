@@ -1,0 +1,88 @@
+<!-- views/search.ejs -->
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="main-content">
+    <div class="container">
+        <div class="search-header">
+            <h1>Search Results</h1>
+            <% if (query) { %>
+                <p>Showing results for "<strong><%= query %></strong>"</p>
+            <% } else if (category) { %>
+                <p>Showing books in "<strong><%= category %></strong>" category</p>
+            <% } %>
+            <span class="results-count"><%= totalResults %> books found</span>
+        </div>
+        
+        <div class="search-filters">
+            <div class="filter-group">
+                <label>Category:</label>
+                <select id="categoryFilter" onchange="filterByCategory(this.value)">
+                    <option value="">All Categories</option>
+                    <option value="fiction" <%= category === 'fiction' ? 'selected' : '' %>>Fiction</option>
+                    <option value="science" <%= category === 'science' ? 'selected' : '' %>>Science</option>
+                    <option value="history" <%= category === 'history' ? 'selected' : '' %>>History</option>
+                    <option value="philosophy" <%= category === 'philosophy' ? 'selected' : '' %>>Philosophy</option>
+                    <option value="poetry" <%= category === 'poetry' ? 'selected' : '' %>>Poetry</option>
+                </select>
+            </div>
+        </div>
+        
+        <% if (typeof error !== 'undefined') { %>
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p><%= error %></p>
+            </div>
+        <% } %>
+        
+        <div class="books-grid">
+            <% books.forEach(book => { %>
+                <div class="book-card">
+                    <div class="book-cover">
+                        <img src="<%= book.coverImage %>" alt="<%= book.title %>" loading="lazy">
+                        <div class="book-overlay">
+                            <a href="<%= book.downloadUrl %>" target="_blank" class="read-btn">
+                                <i class="fas fa-book-open"></i> Read
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="book-info">
+                        <h3 class="book-title"><%= book.title %></h3>
+                        <p class="book-author">by <%= book.authors %></p>
+                        
+                        <div class="book-meta">
+                            <span class="book-source">
+                                <i class="fas fa-external-link-alt"></i> <%= book.source %>
+                            </span>
+                            <% if (book.downloadCount) { %>
+                                <span class="book-downloads">
+                                    <i class="fas fa-download"></i> <%= book.downloadCount %>
+                                </span>
+                            <% } %>
+                        </div>
+                        
+                        <% if (book.subjects && book.subjects.length > 0) { %>
+                            <div class="book-subjects">
+                                <% book.subjects.slice(0, 2).forEach(subject => { %>
+                                    <span class="subject-tag"><%= subject %></span>
+                                <% }); %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+        
+        <% if (totalResults === 0) { %>
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <h3>No books found</h3>
+                <p>Try adjusting your search terms or browse our categories.</p>
+                <a href="/categories" class="btn">Browse Categories</a>
+            </div>
+        <% } %>
+    </div>
+</main>
+
+<%- include('partials/footer') %>

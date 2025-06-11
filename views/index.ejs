@@ -1,0 +1,165 @@
+<!-- views/index.ejs -->
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="main-content">
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <h1>Discover Free Books from Around the World</h1>
+            <p>Access thousands of free books from Project Gutenberg, Open Library, and Internet Archive</p>
+            
+            <div class="hero-search">
+                <form action="/search" method="GET" class="hero-search-form">
+                    <input type="text" name="q" placeholder="Search for books, authors, or subjects..." class="hero-search-input">
+                    <button type="submit" class="hero-search-btn">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </form>
+            </div>
+            
+            <div class="hero-stats">
+                <div class="stat">
+                    <i class="fas fa-book"></i>
+                    <span><%= totalBooks %>+</span>
+                    <p>Books Available</p>
+                </div>
+                <div class="stat">
+                    <i class="fas fa-download"></i>
+                    <span>Free</span>
+                    <p>Downloads</p>
+                </div>
+                <div class="stat">
+                    <i class="fas fa-globe"></i>
+                    <span>3</span>
+                    <p>Sources</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Categories -->
+    <section class="quick-categories">
+        <div class="container">
+            <h2>Popular Categories</h2>
+            <div class="category-grid">
+                <a href="/search?category=fiction" class="category-card">
+                    <i class="fas fa-magic"></i>
+                    <h3>Fiction</h3>
+                    <p>Novels, stories & literature</p>
+                </a>
+                
+                <a href="/search?category=science" class="category-card">
+                    <i class="fas fa-atom"></i>
+                    <h3>Science</h3>
+                    <p>Scientific research & discoveries</p>
+                </a>
+                
+                <a href="/search?category=history" class="category-card">
+                    <i class="fas fa-landmark"></i>
+                    <h3>History</h3>
+                    <p>Historical events & biographies</p>
+                </a>
+                
+                <a href="/search?category=philosophy" class="category-card">
+                    <i class="fas fa-brain"></i>
+                    <h3>Philosophy</h3>
+                    <p>Philosophical thoughts & ideas</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Featured Books -->
+    <section class="featured-books">
+        <div class="container">
+            <div class="section-header">
+                <h2>Featured Books</h2>
+                <a href="/trending" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
+            </div>
+            
+            <% if (typeof error !== 'undefined') { %>
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p><%= error %></p>
+                </div>
+            <% } %>
+            
+            <div class="books-grid">
+                <% books.forEach(book => { %>
+                    <div class="book-card">
+                        <div class="book-cover">
+                            <img src="<%= book.coverImage %>" alt="<%= book.title %>" loading="lazy">
+                            <div class="book-overlay">
+                                <a href="<%= book.downloadUrl %>" target="_blank" class="read-btn">
+                                    <i class="fas fa-book-open"></i> Read
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="book-info">
+                            <h3 class="book-title"><%= book.title %></h3>
+                            <p class="book-author">by <%= book.authors %></p>
+                            
+                            <div class="book-meta">
+                                <span class="book-source">
+                                    <i class="fas fa-external-link-alt"></i> <%= book.source %>
+                                </span>
+                                <% if (book.downloadCount) { %>
+                                    <span class="book-downloads">
+                                        <i class="fas fa-download"></i> <%= book.downloadCount %>
+                                    </span>
+                                <% } %>
+                            </div>
+                            
+                            <% if (book.subjects && book.subjects.length > 0) { %>
+                                <div class="book-subjects">
+                                    <% book.subjects.slice(0, 2).forEach(subject => { %>
+                                        <span class="subject-tag"><%= subject %></span>
+                                    <% }); %>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sources Section -->
+    <section class="sources-section">
+        <div class="container">
+            <h2>Our Book Sources</h2>
+            <div class="sources-grid">
+                <div class="source-card">
+                    <div class="source-icon">
+                        <i class="fas fa-scroll"></i>
+                    </div>
+                    <h3>Project Gutenberg</h3>
+                    <p>Over 60,000 free eBooks of classic literature, including works by Shakespeare, Dickens, and many others.</p>
+                    <a href="https://www.gutenberg.org" target="_blank" class="source-link">Visit Site</a>
+                </div>
+                
+                <div class="source-card">
+                    <div class="source-icon">
+                        <i class="fas fa-university"></i>
+                    </div>
+                    <h3>Open Library</h3>
+                    <p>An open, editable library catalog with millions of books from libraries around the world.</p>
+                    <a href="https://openlibrary.org" target="_blank" class="source-link">Visit Site</a>
+                </div>
+                
+                <div class="source-card">
+                    <div class="source-icon">
+                        <i class="fas fa-archive"></i>
+                    </div>
+                    <h3>Internet Archive</h3>
+                    <p>A digital library with millions of books, movies, music, and more from various collections.</p>
+                    <a href="https://archive.org" target="_blank" class="source-link">Visit Site</a>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<%- include('partials/footer') %>
